@@ -46,7 +46,7 @@ func main() {
 				export(c)
 			},
 		},
-		{
+    {
 			Name:    "test",
 			Aliases: []string{"c"},
 			Usage:   "test auth token for validity",
@@ -54,6 +54,14 @@ func main() {
 				testToken(c)
 			},
 		},
+    {
+      Name:    "auth",
+      Aliases: []string{"c"},
+      Usage:   "get/set auth tokens",
+      Action: func(c *cli.Context) {
+        doAuth(c)
+      },
+    },
 	}
 
 	app.RunAndExitOnError()
