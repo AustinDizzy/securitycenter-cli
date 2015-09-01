@@ -3,6 +3,7 @@ package main
 import (
   "log"
   "github.com/codegangsta/cli"
+  "runtime"
 )
 
 func main() {
@@ -59,12 +60,17 @@ func main() {
 }
 
 func LogErr(c *cli.Context, err error, data ...interface{}) {
-  if err != nil {
-    log.Println(err)
-  }
+  pc := make([]uintptr, 10)
+  runtime.Callers(2, pc)
+  f := runtime.FuncForPC(pc[0])
+
   if len(data) > 0 && c.GlobalBool("debug") {
     for i := range data {
-      log.Println(data[i])
+      log.Printf("[%s] - %#v", f.Name(), data[i])
     }
+  }
+
+  if err != nil {
+    log.Println("[" + f.Name() + "]", err)
   }
 }
