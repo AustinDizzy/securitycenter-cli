@@ -10,7 +10,7 @@ func export(c *cli.Context) {
 }
 
 func testToken(c *cli.Context) {
-  fields := map[string]string{"fields":"firstname,lastname,username"}
+  fields := map[string]interface{}{"fields":"firstname,lastname,username"}
   res, err := get(c, "currentUser", fields)
   LogErr(c, err, "testing token")
   if res.data != nil {
