@@ -59,7 +59,16 @@ func main() {
       Aliases: []string{"c"},
       Usage:   "get/set auth tokens",
       Action: func(c *cli.Context) {
-        doAuth(c)
+        var (
+          keys map[string]string
+          err error
+        )
+        if keys, err = getAuthKeys(c); len(keys) == 0 {
+            doAuth(c)
+            keys, err = getAuthKeys(c)
+        }
+        LogErr(c, err, keys)
+        log.Printf("Keys:\ntoken: %s\tsession: %s\n", keys["token"], keys["session"])
       },
     },
 	}

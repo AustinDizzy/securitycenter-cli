@@ -88,6 +88,4 @@ func doAuth(c *cli.Context) {
     setAuthKeys(c, data)
   }
   LogErr(c, err)
-
-  println(data["token"], data["session"])
 }
