@@ -70,6 +70,18 @@ func main() {
         LogErr(c, err, keys)
         log.Printf("Keys:\ntoken: %s\tsession: %s\n", keys["token"], keys["session"])
       },
+      Subcommands: []cli.Command{{
+        Name: "delete",
+        Aliases: []string{"d", "del"},
+        Usage: "delete stored authentication",
+        Action: func(c *cli.Context) {
+          if err := delAuth(c); err == nil {
+            log.Println("Authentication deleted.")
+          } else {
+            LogErr(c, err)
+          }
+        },
+      },},
     },
 	}
 

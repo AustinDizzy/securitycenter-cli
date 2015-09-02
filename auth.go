@@ -12,6 +12,11 @@ import (
   "github.com/howeyc/gopass"
 )
 
+const (
+  authBucketName = "AuthBucket"
+  authDB = "auth.db"
+)
+
 func getAuthKeys(c *cli.Context) (map[string]string, error) {
   data := map[string]string{}
 
@@ -21,15 +26,15 @@ func getAuthKeys(c *cli.Context) (map[string]string, error) {
     return data, nil
   }
 
-  db, err := bolt.Open("auth.db", 0600, nil)
+  db, err := bolt.Open(authDB, 0600, &bolt.Options{ReadOnly: true})
   LogErr(c, err)
-  if err != nil {
+  if err != nil && err.Error() != "" {
     return data, err
   }
   defer db.Close()
 
   db.View(func(tx *bolt.Tx) error {
-    b := tx.Bucket([]byte("AuthBucket"))
+    b := tx.Bucket([]byte(authBucketName))
     b.ForEach(func(k, v []byte) error {
       data[string(k[:])] = string(v[:])
       return nil
@@ -42,13 +47,13 @@ func getAuthKeys(c *cli.Context) (map[string]string, error) {
 }
 
 func setAuthKeys(c *cli.Context, keys map[string]string) {
-  db, err := bolt.Open("auth.db", 0600, nil)
+  db, err := bolt.Open(authDB, 0600, nil)
   LogErr(c, err)
   defer db.Close()
 
   for k := range keys {
     db.Update(func(tx *bolt.Tx) error {
-      b, _ := tx.CreateBucketIfNotExists([]byte("AuthBucket"))
+      b, _ := tx.CreateBucketIfNotExists([]byte(authBucketName))
       b.Put([]byte(k), []byte(keys[k]))
       return nil
     })
@@ -88,4 +93,22 @@ func doAuth(c *cli.Context) {
     setAuthKeys(c, data)
   }
   LogErr(c, err)
+}
+
+func delAuth(c *cli.Context) error {
+  db, err := bolt.Open(authDB, 0600, nil)
+  LogErr(c, err)
+  defer db.Close()
+  if err != nil {
+    return err
+  }
+
+  return db.Update(func(tx *bolt.Tx) error {
+    err := tx.DeleteBucket([]byte(authBucketName))
+    if err != nil {
+      return err
+    }
+    _, err = tx.CreateBucketIfNotExists([]byte(authBucketName))
+    return err
+  })
 }
