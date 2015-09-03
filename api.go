@@ -7,8 +7,8 @@ import (
   "github.com/bitly/go-simplejson"
   "net/http"
   "net/url"
+  "time"
   "errors"
-  "io/ioutil"
   "runtime"
   "github.com/codegangsta/cli"
 )
@@ -48,7 +48,9 @@ func do(c *cli.Context, method, path string, data map[string]interface{}) (*http
     }
   }
 
-  client := &http.Client{}
+  client := &http.Client{
+    Timeout: time.Duration(90 * time.Second),
+  }
   req, err := http.NewRequest(method, u.String(), bytes.NewBuffer(postData))
   LogErr(c, err, method + " request to " + u.String())
   if err != nil {
@@ -103,8 +105,6 @@ func post(c *cli.Context, path string, data map[string]interface{}) (*result, er
 
   json, err := simplejson.NewFromReader(resp.Body)
   res := &result{resp.Request.URL.String(), json}
-  b, _ := ioutil.ReadAll(resp.Body)
-  println(string(b))
 
   return res, err
 }
@@ -122,8 +122,6 @@ func get(c *cli.Context, path string, data map[string]interface{}) (*result, err
 
   json, err := simplejson.NewFromReader(resp.Body)
   res := &result{resp.Request.URL.String(), json}
-  b, _ := ioutil.ReadAll(resp.Body)
-  println(string(b))
 
   return res, err
 }

@@ -45,6 +45,11 @@ func main() {
 			Action: func(c *cli.Context) {
 				export(c)
 			},
+      Flags: []cli.Flag{
+        cli.StringFlag{Name: "fields", Usage: "fields to export"},
+        cli.StringFlag{Name: "filter", Usage: "filter exported records"},
+        cli.StringFlag{Name: "output", Usage: "optional file output"},
+      },
 		},
     {
 			Name:    "test",
