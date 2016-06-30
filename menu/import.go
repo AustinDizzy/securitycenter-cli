@@ -128,6 +128,16 @@ func do(c *cli.Context, typeSwitch int, r *csv.Reader) {
 
 	bar.Start() //start the progress bar
 
+	var ( //instantiate variables required for rate limiting / throttling
+		rate     time.Duration
+		throttle <-chan time.Time
+	)
+
+	if c.GlobalInt("throttle") > 0 {
+		rate, _ = time.ParseDuration(fmt.Sprintf("%dms", c.GlobalInt("throttle")))
+		throttle = time.Tick(rate)
+	}
+
 	//for all the records, minus the first line - which are the headers
 	for i, row := range records[1:] {
 		var (
@@ -247,6 +257,13 @@ func do(c *cli.Context, typeSwitch int, r *csv.Reader) {
 		//get a string representation of the JSON object to post
 		dataString, _ := json.Marshal(data)
 		utils.LogErr(c, nil, string(dataString[:]))
+
+		//if the user specifies a valid throttle length
+		if c.GlobalInt("throttle") > 0 {
+			//waits for a tick from the "throttle" channel, effectively throttling (by
+			// blocking) the process for as long as the rate time.Duration specifies
+			<-throttle
+		}
 
 		res, err := api.NewRequest("POST", endpoint, data).WithAuth(keys).Do(c)
 		bar.Increment()

@@ -47,6 +47,11 @@ func main() {
 			Name:  "debug",
 			Usage: "Enable verbose logging.",
 		},
+		cli.IntFlag{
+			Name:  "throttle",
+			Usage: "Throttle requests by N milliseconds",
+			Value: -1,
+		},
 	}
 	app.Before = func(c *cli.Context) error {
 		println()
