@@ -2,8 +2,8 @@ package menu
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -157,7 +157,7 @@ func exportAssets(c *cli.Context, w *csv.Writer) {
 		s       = spinner.New(spinner.CharSets[9], 100*time.Millisecond)
 		query   = map[string]interface{}{
 			"filter": "manageable",
-			"fields": "id,type,name,description,typeFields,groups",
+			"fields": "id,type,name,description,typeFields,groups,owner,ownerGroup",
 		}
 		keys, err = auth.Get(c)
 		t         = time.Now()
@@ -184,7 +184,7 @@ func exportAssets(c *cli.Context, w *csv.Writer) {
 
 	for _, d := range assets {
 		var (
-			row  = make([]string, 6)
+			row  = make([]string, 9)
 			data = d.(map[string]interface{})
 		)
 
@@ -195,6 +195,14 @@ func exportAssets(c *cli.Context, w *csv.Writer) {
 
 		if ips, ok := data["typeFields"].(map[string]interface{})["definedIPs"]; ok {
 			row[4] = fmt.Sprint(ips)
+		}
+
+		if owner, ok := data["owner"].(map[string]interface{})["username"]; ok {
+			row[5] = fmt.Sprint(owner)
+		}
+
+		if ownerGroup, ok := data["ownerGroup"].(map[string]interface{})["name"]; ok {
+			row[6] = fmt.Sprint(ownerGroup)
 		}
 
 		var (
@@ -214,13 +222,20 @@ func exportAssets(c *cli.Context, w *csv.Writer) {
 			groupNames = append(groupNames, fmt.Sprint(group["name"]))
 		}
 
-		row[5] = strings.Join(groupNames, "|")
+		row[7] = strings.Join(groupNames, "|")
+
+		if data["type"] == "dynamic" {
+			if rules, ok := data["typeFields"].(map[string]interface{})["rules"]; ok {
+				rulesStr, _ := json.Marshal(rules.(map[string]interface{}))
+				row[8] = string(rulesStr)
+			}
+		}
 
 		records = append(records, row)
 		bar.Increment()
 	}
 
-	w.Write([]string{"id", "type", "name", "description", "definedIPs", "groups"})
+	w.Write([]string{"id", "type", "name", "description", "definedIPs", "owner", "ownerGroup", "groups", "rules"})
 	err = w.WriteAll(records)
 	utils.LogErr(c, err)
 	w.Flush()
