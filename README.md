@@ -4,7 +4,7 @@
 ## Summary
 This is a simple command line application to use various tasks capable in [Tenable Network Security](https://www.tenable.com)'s [Security Center](https://www.tenable.com/products/securitycenter) (>= v5.0) and manipulate data within SecurityCenter. This should make automating various tasks in SecurityCenter (such as automated backups, syncing assets from a local database or file into SC, auditing user acces, etc) much easier.
 
-Built-in is also an interactive menu useful for exporting and importing records (Assets, Users, Groups, Scan Results). This menu, and mostly this entire command line application, was built based on requirements needed by West Virginia University's Information Security Services Office. I figured other organizations may be in need of the same easy-to-use tools so here they are open sourced.
+Built-in is also an interactive menu useful for exporting and importing records (Assets, Users, Groups, Scan Results). This menu, and mostly this entire command line application, was built based on requirements needed by West Virginia University's Information Security Services. This project is open-source licensed by the GNU General Public License (v3) found in the LICENSE file in this directory.
 
 Supported are Linux, Mac OS, and Windows environments via the `go build` tool.
 
