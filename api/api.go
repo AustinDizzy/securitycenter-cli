@@ -136,9 +136,11 @@ func (r *Request) Do(c *cli.Context) (*Result, error) {
 		return nil, err
 	}
 
-	defer resp.Body.Close()
+	if resp.Header.Get("Content-Type") == "application/json" {
+		defer resp.Body.Close()
+		jsonResp, err = simplejson.NewFromReader(resp.Body)
+	}
 
-	jsonResp, err = simplejson.NewFromReader(resp.Body)
 	res = &Result{
 		Status:  resp.StatusCode,
 		URL:     resp.Request.URL.String(),
