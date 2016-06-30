@@ -24,7 +24,7 @@ type Export struct {
 
 func (x Export) String() string {
 	return `EXPORT Menu
-      1.) Custom Query
+      1.) Active Scans
       2.) Assets (Name, Description, Range)
       3.) Users (Username, Name, Group, Role)
       4.) Groups
@@ -47,18 +47,15 @@ func (x Export) Start(c *cli.Context) {
 //Process the selection chosen from the Export menu
 func (x Export) Process(c *cli.Context, selection string) {
 	var (
-		filePath  = GetInput("Please enter location to save export (.csv)")
-		file, err = os.Create(filePath)
-		w         *csv.Writer
+		w *csv.Writer
 	)
-
-	utils.LogErr(c, err)
-	defer file.Close()
-
-	w = csv.NewWriter(file)
-	w.UseCRLF = true
+	if selection != "6" {
+		w = GetWriter(c)
+	}
 
 	switch selection {
+	case "1":
+		exportScans(c, w)
 	case "2":
 		exportAssets(c, w)
 	case "3":
@@ -70,6 +67,88 @@ func (x Export) Process(c *cli.Context, selection string) {
 	case "6":
 		exportReports(c, w)
 	}
+}
+
+func exportScans(c *cli.Context, w *csv.Writer) {
+	var (
+		records [][]string
+		s       = spinner.New(spinner.CharSets[9], 100*time.Millisecond)
+		query   = map[string]interface{}{
+			"filter": "manageable",
+			"fields": "owner,groups,ownerGroup,status,name,createdTime,schedule,policy,plugin,type",
+		}
+		//the header to write to the CSV file
+		header    = "id,name,status,type,owner.username,ownerGroup.name,createdTime,plugin.id,plugin.name,policy.id,policy.name,schedule.nextRun,schedule.repeatRule,schedule.start,schedule.type"
+		keys, err = auth.Get(c)
+		t         = time.Now()
+		res       *api.Result
+	)
+
+	if err != nil {
+		utils.LogErr(c, err)
+		return
+	}
+	s.Prefix = "Exporting..."
+	s.Start()
+
+	res, err = api.NewRequest("GET", "scan", query).WithAuth(keys).Do(c)
+
+	var (
+		scans = res.Data.GetPath("response", "manageable").MustArray()
+		bar   = pb.New(len(scans))
+	)
+
+	utils.LogErr(c, err)
+	s.Stop()
+	bar.Start()
+
+	for i := range scans {
+		var (
+			row  = make([]string, 15)
+			data = scans[i].(map[string]interface{})
+		)
+		row[0] = fmt.Sprint(data["id"])
+		row[1] = fmt.Sprint(data["name"])
+		row[2] = fmt.Sprint(data["status"])
+		row[3] = fmt.Sprint(data["type"])
+
+		if owner, ok := data["owner"].(map[string]interface{}); ok {
+			row[4] = fmt.Sprint(owner["username"])
+		}
+
+		if ownergroup, ok := data["ownerGroup"].(map[string]interface{}); ok {
+			row[5] = fmt.Sprint(ownergroup["name"])
+		}
+
+		row[6] = fmt.Sprint(data["createdTime"])
+
+		if plugin, ok := data["plugin"].(map[string]interface{}); ok {
+			row[7] = fmt.Sprint(plugin["id"])
+			row[8] = fmt.Sprint(plugin["name"])
+		}
+
+		if policy, ok := data["policy"].(map[string]interface{}); ok {
+			row[9] = fmt.Sprint(policy["id"])
+			row[10] = fmt.Sprint(policy["name"])
+		}
+
+		if schedule, ok := data["schedule"].(map[string]interface{}); ok {
+			row[11] = fmt.Sprint(schedule["nextRun"])
+			row[12] = fmt.Sprint(schedule["repeatRule"])
+			row[13] = fmt.Sprint(schedule["start"])
+			row[14] = fmt.Sprint(schedule["type"])
+		}
+
+		records = append(records, row)
+		bar.Increment()
+	}
+
+	w.Write(strings.Split(header, ","))
+	err = w.WriteAll(records)
+	utils.LogErr(c, err)
+	w.Flush()
+
+	bar.FinishPrint(fmt.Sprintf("Exported %d scans in %s\n", len(records), time.Since(t)))
 }
 
 func exportAssets(c *cli.Context, w *csv.Writer) {
@@ -363,8 +442,4 @@ func exportRepos(c *cli.Context, w *csv.Writer) {
 	w.Flush()
 
 	bar.FinishPrint(fmt.Sprintf("Exported %d repositories in %s\n", len(records), time.Since(t)))
-}
-
-func exportReports(c *cli.Context, w *csv.Writer) {
-	//todo: this
 }
