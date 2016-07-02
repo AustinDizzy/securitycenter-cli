@@ -65,7 +65,8 @@ func (x Export) Process(c *cli.Context, selection string) {
 	case "5":
 		exportRepos(c, w)
 	case "6":
-		exportReports(c, w)
+		//create a new Report menu and start it
+		new(Report).Start(c)
 	}
 }
 
