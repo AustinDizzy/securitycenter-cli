@@ -1,12 +1,21 @@
 # SecurityCenter CLI *(written in Go)*
 
 ---
+**Note**: Please keep in mind this is to be considered alpha software. Use it in production environments at your own discretion.
+
 ## Summary
 This is a simple command line application to use various tasks capable in [Tenable Network Security](https://www.tenable.com)'s [Security Center](https://www.tenable.com/products/securitycenter) (>= v5.0) and manipulate data within SecurityCenter. This should make automating various tasks in SecurityCenter (such as automated backups, syncing assets from a local database or file into SC, auditing user acces, etc) much easier.
 
-Built-in is also an interactive menu useful for exporting and importing records (Assets, Users, Groups, Scan Results). This menu, and mostly this entire command line application, was built based on requirements needed by West Virginia University's Information Security Services. This project is open-source licensed by the GNU General Public License (v3) found in the LICENSE file in this directory.
+Built-in is also an interactive menu useful for exporting and importing records (Assets, Users, Groups, Scan Results). This menu, and mostly this entire command line application, was built based on requirements needed or requested by West Virginia University's Information Security Services. This project is open-source licensed by the GNU General Public License (v3) found in the LICENSE file in this directory.
 
-Supported are Linux, Mac OS, and Windows environments via the `go build` tool.
+Supported are Linux, Mac OS, and Windows environments via Go's popular `go build` tool command.
+
+
+## Downloading and Installing
+
+* **With [Go installed](https://golang.org/doc/install)**: `go get github.com/austindizzy/securitycenter-cli`
+* **Without Go**: Download your OS specific binary from this project's [releases](https://github.com/austindizzy/securitycenter-cli/releases) page.
+
 
 ## Third-Party Technologies
 
@@ -15,6 +24,7 @@ This was built using the following technologies:
 * [Go](https://golang.org) ( > 1.5)
     * [Bolt](https://github.com/boltdb/bolt) - "A fast key/value store inspired by [Howard Chu's LMDB project](https://symas.com/products/lightning-memory-mapped-database/)."
     * [cli](https://github.com/urfave/cli) - A library to help make building command line applications in Go easier.
+
 
 ## Documentation [![GoDoc](https://godoc.org/github.com/austindizzy/securitycenter-cli?status.svg)](https://godoc.org/github.com/austindizzy/securitycenter-cli)
 
