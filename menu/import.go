@@ -14,6 +14,7 @@ import (
 	"github.com/austindizzy/securitycenter-cli/api"
 	"github.com/austindizzy/securitycenter-cli/auth"
 	"github.com/austindizzy/securitycenter-cli/utils"
+	"github.com/bitly/go-simplejson"
 	"github.com/urfave/cli"
 )
 
@@ -151,6 +152,22 @@ func do(c *cli.Context, typeSwitch int, r *csv.Reader) {
 
 		//switch manipulating the data object to be POSTed based on the typeSwitch
 		switch typeSwitch {
+		case importAssets:
+			delete(data, "owner")
+			delete(data, "ownerGroup")
+			if data["type"] == "dynamic" {
+				delete(data, "definedIPs")
+				if rules, ok := data["rules"]; ok {
+					rulesJSON, err := simplejson.NewJson([]byte(fmt.Sprint(rules)))
+					utils.LogErr(c, err)
+
+					data["rules"], _ = rulesJSON.Map()
+				} else {
+					utils.LogErr(c, fmt.Errorf("Dynamic asset \"%s\" requires valid rule set.", data["name"]))
+				}
+			} else {
+				delete(data, "rules")
+			}
 		case importUsers:
 			//default user preferences
 			data["preferences"] = []map[string]string{
