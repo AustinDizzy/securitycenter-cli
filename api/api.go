@@ -1,3 +1,5 @@
+// Package api is used to communicate with SecurityCenter's REST JSON API,
+// in the context of a command line application.
 package api
 
 import (
@@ -16,22 +18,22 @@ import (
 	"github.com/urfave/cli"
 )
 
-//Request to be sent to SecurityCenter API
+// Request to be sent to SecurityCenter API
 type Request struct {
 	Keys         map[string]string
 	method, path string
 	Data         map[string]interface{}
 }
 
-//Result from SecurityCenter API
+// Result from SecurityCenter API
 type Result struct {
-	//Status code of the HTTP request made
+	// Status code of the HTTP request made
 	Status int
-	//URL of the HTTP request made
+	// URL of the HTTP request made
 	URL string
-	//Data response from the API in simplejson/json format
+	// Data response from the API in simplejson/json format
 	Data *simplejson.Json
-	//HTTPRes is the raw net/http request for easy request customizations
+	// HTTPRes is the raw net/http request for easy request customizations
 	HTTPRes *http.Response
 }
 
@@ -51,14 +53,17 @@ func NewRequest(method, path string, data ...map[string]interface{}) *Request {
 	return r
 }
 
-//WithAuth loads the authentication keys given into the request for the
-//request to be authenticated as a user
+// WithAuth loads the authentication keys given into the request for the
+// request to be authenticated as a user.
+// As of SecurityCenter v5, this requires a "session" key with the value of the
+// TNS_SESSION cookie, and a "token" key with the value of the X-SecurityCenter
+// request header.
 func (r *Request) WithAuth(keys map[string]string) *Request {
 	r.Keys = keys
 	return r
 }
 
-//Do performs the request and returns the result and any errors.
+// Do performs the request and returns the result and any errors.
 func (r *Request) Do(c *cli.Context) (*Result, error) {
 	var (
 		err      error

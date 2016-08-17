@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -19,7 +20,8 @@ import (
 
 const (
 	//BucketName is the name of the bucket created in the bolt database
-	//to store authentication information
+	//to store authentication information. The BucketName is prepended to the
+	//uri of the SecurityCenter instance.
 	BucketName = "AuthBucket"
 	//DB is the name of the bolt database file
 	DB = "auth.db"
@@ -33,10 +35,12 @@ const (
 //the local bolt database file (auth.db).
 func Get(c *cli.Context) (map[string]string, error) {
 	var (
-		i    int64
-		db   *bolt.DB
-		err  error
-		data = map[string]string{}
+		i      int64
+		db     *bolt.DB
+		err    error
+		data   = map[string]string{}
+		bucket = fmt.Sprintf("%s|%s", BucketName, c.GlobalString("host"))
+		b      *bolt.Bucket
 	)
 
 	if len(c.GlobalString("token")) > 0 && len(c.GlobalString("session")) > 0 {
@@ -45,15 +49,19 @@ func Get(c *cli.Context) (map[string]string, error) {
 		return data, nil
 	}
 
-	db, err = bolt.Open(DB, 0600, &bolt.Options{ReadOnly: true})
+	db, err = bolt.Open(DB, 0600, nil)
 
 	if err != nil && err.Error() != "" {
 		return data, err
 	}
 	defer db.Close()
 
+	db.Update(func(tx *bolt.Tx) error {
+		b, err = tx.CreateBucketIfNotExists([]byte(bucket))
+		return err
+	})
+
 	db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(BucketName))
 		b.ForEach(func(k, v []byte) error {
 			data[string(k[:])] = string(v[:])
 			return nil
@@ -61,11 +69,13 @@ func Get(c *cli.Context) (map[string]string, error) {
 		return nil
 	})
 
-	i, err = strconv.ParseInt(data["__timestamp"], 10, 64)
-	if time.Since(time.Unix(i, 0)) > ETC {
-		err = Delete(c)
-		println("Your session has expired.")
-		data = nil
+	if _, ok := data["__timestamp"]; ok {
+		i, err = strconv.ParseInt(data["__timestamp"], 10, 64)
+		if time.Since(time.Unix(i, 0)) > ETC {
+			err = Delete(c)
+			println("Your session has expired.")
+			data = nil
+		}
 	}
 
 	return data, err
@@ -77,19 +87,19 @@ func Get(c *cli.Context) (map[string]string, error) {
 //field to auto invalidate the session after a specified time.
 func Set(c *cli.Context, keys map[string]string) {
 	var (
-		k       string
+		k, v    string
 		db, err = bolt.Open(DB, 0600, nil)
+		bucket  = fmt.Sprintf("%s|%s", BucketName, c.GlobalString("host"))
 	)
 	utils.LogErr(c, err)
 	defer db.Close()
 
 	keys["__timestamp"] = fmt.Sprint(time.Now().Unix())
 
-	for k = range keys {
+	for k, v = range keys {
 		db.Update(func(tx *bolt.Tx) error {
-			b, _ := tx.CreateBucketIfNotExists([]byte(BucketName))
-			b.Put([]byte(k), []byte(keys[k]))
-			return nil
+			b, _ := tx.CreateBucketIfNotExists([]byte(bucket))
+			return b.Put([]byte(k), []byte(v))
 		})
 	}
 }
@@ -105,6 +115,7 @@ func Do(c *cli.Context) {
 		jsonStr  []byte
 		msg      = fmt.Sprintf("You are logging into %s", color.CyanString("%s", c.GlobalString("host"))) +
 			fmt.Sprintf("\nYour session will self-destruct in %s", color.RedString("%s", ETC))
+		sessionRgx = regexp.MustCompile(`(?:TNS_SESSIONID=)(.*?)(?:;)`)
 	)
 
 	fmt.Fprintf(color.Output, "%s\n\nUsername: ", msg)
@@ -121,16 +132,14 @@ func Do(c *cli.Context) {
 	res, err := api.NewRequest("GET", "system").Do(c)
 	utils.LogErr(c, err)
 
-	for _, c := range res.HTTPRes.Cookies() {
-		if c.Name == "TNS_SESSIONID" {
-			data["session"] = c.Value
-		}
+	if mtch := sessionRgx.FindStringSubmatch(res.HTTPRes.Header.Get("Set-Cookie")); len(mtch) > 1 {
+		data["session"] = mtch[1]
 	}
 
 	res, err = api.NewRequest("POST", "token", map[string]interface{}{
 		"password": string(password[:]),
 		"username": username,
-	}).Do(c)
+	}).WithAuth(data).Do(c)
 
 	jsonStr, err = res.Data.MarshalJSON()
 	utils.LogErr(c, err, string(jsonStr[:]))
@@ -140,6 +149,7 @@ func Do(c *cli.Context) {
 		data["token"] = fmt.Sprint(t)
 		Set(c, data)
 	}
+	fmt.Printf("session: %s, token: %s\n", data["session"], data["token"])
 }
 
 //Delete will purge the local bolt database. Note this does not invalidate the
@@ -147,18 +157,21 @@ func Do(c *cli.Context) {
 //elsewhere. An option for also invalidating the session may be present in
 //future iteration(s).
 func Delete(c *cli.Context) error {
-	db, err := bolt.Open(DB, 0600, nil)
+	var (
+		db, err = bolt.Open(DB, 0600, nil)
+		bucket  = fmt.Sprintf("%s|%s", BucketName, c.GlobalString("host"))
+	)
 	defer db.Close()
 	if err != nil {
 		return err
 	}
 
 	return db.Update(func(tx *bolt.Tx) error {
-		err := tx.DeleteBucket([]byte(BucketName))
+		err := tx.DeleteBucket([]byte(bucket))
 		if err != nil {
 			return err
 		}
-		_, err = tx.CreateBucketIfNotExists([]byte(BucketName))
+		_, err = tx.CreateBucketIfNotExists([]byte(bucket))
 		return err
 	})
 }
@@ -190,7 +203,7 @@ func Test(c *cli.Context) (ok bool) {
 		data := res.Data.Get("response")
 		fmt.Printf("Hello %s %s (%s).\n", data.Get("firstname").MustString(), data.Get("lastname").MustString(), data.Get("username").MustString())
 	} else {
-		fmt.Printf("No auth present. Please run `%s auth` to start your session.", c.App.Name)
+		fmt.Printf("No valid authentication. Please run `%s auth` to start your session.", c.App.Name)
 	}
 
 	return ok
