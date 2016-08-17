@@ -14,15 +14,29 @@ import (
 
 func export(c *cli.Context) error {
 	fmt.Println("exporting", c.Args().First())
-	query := map[string]interface{}{}
-	var w *csv.Writer
+	var (
+		w         *csv.Writer
+		headers   []string
+		query     = map[string]interface{}{}
+		keys, err = auth.Get(c)
+		file      *os.File
+		res       *api.Result
+	)
+
+	if err != nil {
+		utils.LogErr(c, err)
+		return err
+	}
 
 	if c.IsSet("fields") {
-		query["fields"] = c.String("fields")
+		for _, field := range strings.Split(c.String("fields"), ",") {
+			headers = append(headers, strings.Split(field, ".")[0])
+		}
+		query["fields"] = strings.Join(headers, ",")
 	}
 
 	if c.IsSet("output") {
-		file, err := os.Create(c.String("output"))
+		file, err = os.Create(c.String("output"))
 		if err != nil {
 			return err
 		}
@@ -33,14 +47,8 @@ func export(c *cli.Context) error {
 		w = csv.NewWriter(os.Stdout)
 	}
 
-	keys, err := auth.Get(c)
-	if err != nil {
-		utils.LogErr(c, err)
-		return err
-	}
-
 	println("getting " + c.Args().First())
-	res, err := api.NewRequest("GET", c.Args().First(), query).WithAuth(keys).Do(c)
+	res, err = api.NewRequest("GET", c.Args().First(), query).WithAuth(keys).Do(c)
 	utils.LogErr(c, err)
 	if err == nil {
 		var (
@@ -50,14 +58,28 @@ func export(c *cli.Context) error {
 			records = append(records, strings.Split(c.String("fields"), ","))
 		}
 
-		for _, d := range res.Data.Get("response").Get("manageable").MustArray() {
+		var dataArr []interface{}
+
+		if dataArr, err = res.Data.Get("response").Array(); err != nil {
+			dataArr = res.Data.Get("response").Get("manageable").MustArray()
+		}
+
+		for _, d := range dataArr {
 			var (
 				row  []string
 				data = d.(map[string]interface{})
 			)
 			if c.IsSet("fields") {
 				for _, v := range strings.Split(c.String("fields"), ",") {
-					row = append(row, fmt.Sprint(data[v]))
+					if strings.Contains(v, ".") {
+						var (
+							tmp = strings.Split(v, ".")
+							obj = data[tmp[0]].(map[string]interface{})
+						)
+						row = append(row, fmt.Sprint(obj[tmp[1]]))
+					} else {
+						row = append(row, fmt.Sprint(data[v]))
+					}
 				}
 			} else {
 				for _, v := range data {
