@@ -76,10 +76,11 @@ func exportScans(c *cli.Context, w *csv.Writer) {
 		s       = spinner.New(spinner.CharSets[9], 100*time.Millisecond)
 		query   = map[string]interface{}{
 			"filter": "manageable",
-			"fields": "owner,groups,ownerGroup,status,name,createdTime,schedule,policy,plugin,type",
+			"fields": "owner,groups,ownerGroup,status,name,createdTime,schedule,policy,plugin,type,maxScanTime,ipList,assets,scanningVirtualHosts,credentials,zone,dhcpTracking,timeoutAction,description,repository,plugin,rolloverType",
+			"expand": "details",
 		}
 		//the header to write to the CSV file
-		header    = "id,name,status,type,owner.username,ownerGroup.name,createdTime,plugin.id,plugin.name,policy.id,policy.name,schedule.nextRun,schedule.repeatRule,schedule.start,schedule.type"
+		header    = "id,name,status,description,type,owner.username,ownerGroup.name,createdTime,repository.name,ipList,assets,credentials.name,credentials.type,plugin.id,plugin.name,policy.id,policy.name,schedule.nextRun,schedule.repeatRule,schedule.start,schedule.type,timeoutAction,rolloverType,scanningVirtualHosts,dhcpTracking"
 		keys, err = auth.Get(c)
 		t         = time.Now()
 		res       *api.Result
@@ -89,7 +90,7 @@ func exportScans(c *cli.Context, w *csv.Writer) {
 		utils.LogErr(c, err)
 		return
 	}
-	s.Prefix = "Exporting..."
+	s.Prefix = exportPfx
 	s.Start()
 
 	res, err = api.NewRequest("GET", "scan", query).WithAuth(keys).Do(c)
@@ -98,47 +99,80 @@ func exportScans(c *cli.Context, w *csv.Writer) {
 		scans = res.Data.GetPath("response", "manageable").MustArray()
 		bar   = pb.New(len(scans))
 	)
-
 	utils.LogErr(c, err)
 	s.Stop()
 	bar.Start()
 
 	for i := range scans {
 		var (
-			row  = make([]string, 15)
+			row  = make([]string, 25)
 			data = scans[i].(map[string]interface{})
 		)
 		row[0] = fmt.Sprint(data["id"])
 		row[1] = fmt.Sprint(data["name"])
 		row[2] = fmt.Sprint(data["status"])
-		row[3] = fmt.Sprint(data["type"])
+		row[3] = fmt.Sprint(data["description"])
+		row[4] = fmt.Sprint(data["type"])
 
 		if owner, ok := data["owner"].(map[string]interface{}); ok {
-			row[4] = fmt.Sprint(owner["username"])
+			row[5] = fmt.Sprint(owner["username"])
 		}
 
 		if ownergroup, ok := data["ownerGroup"].(map[string]interface{}); ok {
-			row[5] = fmt.Sprint(ownergroup["name"])
+			row[6] = fmt.Sprint(ownergroup["name"])
 		}
 
-		row[6] = fmt.Sprint(data["createdTime"])
+		row[7] = fmt.Sprint(data["createdTime"])
+
+		if repo, ok := data["repository"]; ok {
+			row[8] = fmt.Sprint(repo.(map[string]interface{})["name"])
+		}
+
+		row[9] = fmt.Sprint(data["ipList"])
+
+		var (
+			assets = data["assets"].([]interface{})
+			creds  = data["credentials"].([]interface{})
+		)
+
+		if len(assets) > 0 {
+			var assetNames []string
+			for _, d := range assets {
+				switch d.(type) {
+				case map[string]interface{}:
+					name := fmt.Sprint(d.(map[string]interface{})["name"])
+					assetNames = append(assetNames, name)
+				}
+			}
+			row[10] = strings.Join(assetNames, "|")
+		}
+
+		if len(creds) > 0 {
+			row[11] = fmt.Sprint(creds[0].(map[string]interface{})["name"])
+			row[12] = fmt.Sprint(creds[0].(map[string]interface{})["type"])
+		}
 
 		if plugin, ok := data["plugin"].(map[string]interface{}); ok {
-			row[7] = fmt.Sprint(plugin["id"])
-			row[8] = fmt.Sprint(plugin["name"])
+			row[13] = fmt.Sprint(plugin["id"])
+			row[14] = fmt.Sprint(plugin["name"])
 		}
 
 		if policy, ok := data["policy"].(map[string]interface{}); ok {
-			row[9] = fmt.Sprint(policy["id"])
-			row[10] = fmt.Sprint(policy["name"])
+			row[15] = fmt.Sprint(policy["id"])
+			row[16] = fmt.Sprint(policy["name"])
 		}
 
 		if schedule, ok := data["schedule"].(map[string]interface{}); ok {
-			row[11] = fmt.Sprint(schedule["nextRun"])
-			row[12] = fmt.Sprint(schedule["repeatRule"])
-			row[13] = fmt.Sprint(schedule["start"])
-			row[14] = fmt.Sprint(schedule["type"])
+			row[17] = fmt.Sprint(schedule["nextRun"])
+			row[18] = fmt.Sprint(schedule["repeatRule"])
+			row[19] = fmt.Sprint(schedule["start"])
+			row[20] = fmt.Sprint(schedule["type"])
 		}
+
+		row[21] = fmt.Sprint(data["timeoutAction"])
+		row[22] = fmt.Sprint(data["rolloverType"])
+		row[23] = fmt.Sprint(data["scanningVirtualHosts"])
+		row[24] = fmt.Sprint(data["dhcpTracking"])
 
 		records = append(records, row)
 		bar.Increment()
@@ -169,7 +203,7 @@ func exportAssets(c *cli.Context, w *csv.Writer) {
 		utils.LogErr(c, err)
 		return
 	}
-	s.Prefix = "Exporting..."
+	s.Prefix = exportPfx
 	s.Start()
 
 	res, err = api.NewRequest("GET", "asset", query).WithAuth(keys).Do(c)
@@ -261,7 +295,7 @@ func exportUsers(c *cli.Context, w *csv.Writer) {
 		utils.LogErr(c, err)
 		return
 	}
-	s.Prefix = "Exporting..."
+	s.Prefix = exportPfx
 	s.Start()
 
 	res, err = api.NewRequest("GET", "user", query).WithAuth(keys).Do(c)
@@ -311,7 +345,7 @@ func exportGroups(c *cli.Context, w *csv.Writer) {
 		utils.LogErr(c, err)
 		return
 	}
-	s.Prefix = "Exporting..."
+	s.Prefix = exportPfx
 	s.Start()
 
 	repos, err = api.NewRequest("GET", "repository", map[string]interface{}{
@@ -416,7 +450,7 @@ func exportRepos(c *cli.Context, w *csv.Writer) {
 		utils.LogErr(c, err)
 		return
 	}
-	s.Prefix = "Exporting..."
+	s.Prefix = exportPfx
 	s.Start()
 
 	res, err = api.NewRequest("GET", "repository", query).WithAuth(keys).Do(c)
