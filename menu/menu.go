@@ -12,6 +12,11 @@ type menu interface {
 	Process(c *cli.Context, input string)
 }
 
+const (
+	exportPfx = "Exporting..."
+	importPfx = "Importing..."
+)
+
 //Main menu
 type Main struct {
 	menu

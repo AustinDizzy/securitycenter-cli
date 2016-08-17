@@ -19,6 +19,7 @@ import (
 	"github.com/urfave/cli"
 )
 
+//Report menu
 type Report struct {
 	menu
 }
@@ -74,7 +75,7 @@ func exportReportList(c *cli.Context, w *csv.Writer) {
 		utils.LogErr(c, err)
 		return
 	}
-	s.Prefix = "Exporting..."
+	s.Prefix = exportPfx
 	s.Start()
 
 	res, err = api.NewRequest("GET", "reportDefinition", query).WithAuth(keys).Do(c)
@@ -147,7 +148,7 @@ func exportReports(c *cli.Context, folderpath string) {
 		return
 	}
 
-	s.Prefix = "Exporting..."
+	s.Prefix = exportPfx
 	s.Start()
 
 	res, err = api.NewRequest("GET", "reportDefinition", map[string]interface{}{
@@ -215,7 +216,7 @@ func exportResultsList(c *cli.Context, w *csv.Writer) {
 		utils.LogErr(c, err)
 		return
 	}
-	s.Prefix = "Exporting..."
+	s.Prefix = exportPfx
 	s.Start()
 
 	res, err = api.NewRequest("GET", "report", query).WithAuth(keys).Do(c)
@@ -280,7 +281,7 @@ func exportResults(c *cli.Context, folderpath string) {
 		return
 	}
 
-	s.Prefix = "Exporting..."
+	s.Prefix = exportPfx
 	s.Start()
 
 	res, err = api.NewRequest("GET", "report", map[string]interface{}{

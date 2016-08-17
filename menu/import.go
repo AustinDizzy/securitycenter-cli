@@ -25,11 +25,10 @@ type Import struct {
 
 func (i Import) String() string {
 	return `IMPORT Menu
-      1.) External Scan Results
+      1.) Scans (Tasks and Results)
       2.) Assets (Name, Description, Range)
       3.) Users (Username, Name, Group, Role)
       4.) Groups
-      5.)
       ...
       9.) Return to Main Menu`
 }
@@ -47,9 +46,24 @@ func (i *Import) Start(c *cli.Context) {
 //Process the selection made from the Import menu
 func (i *Import) Process(c *cli.Context, selection string) {
 	var (
+		importType int
+		r          *csv.Reader
+	)
+	switch selection {
+	case "1":
+		new(Scans).Start(c)
+		return
+	case "2":
+		importType = importAssets
+	case "3":
+		importType = importUsers
+	case "4":
+		importType = importGroups
+	}
+
+	var (
 		filePath  = GetInput("Please enter location of file to import (.csv)")
 		file, err = os.Open(filePath) //open the file located at the user-supplied file path
-		r         *csv.Reader
 	)
 
 	utils.LogErr(c, err)
@@ -58,14 +72,7 @@ func (i *Import) Process(c *cli.Context, selection string) {
 	r = csv.NewReader(file) //open a new CSV reader with the opened file
 	r.LazyQuotes = true
 
-	switch selection {
-	case "2":
-		do(c, importAssets, r)
-	case "3":
-		do(c, importUsers, r)
-	case "4":
-		do(c, importGroups, r)
-	}
+	do(c, importType, r)
 }
 
 const (
@@ -278,16 +285,17 @@ func do(c *cli.Context, typeSwitch int, r *csv.Reader) {
 		//if the user specifies a valid throttle length
 		if c.GlobalInt("throttle") > 0 {
 			//waits for a tick from the "throttle" channel, effectively throttling (by
-			// blocking) the process for as long as the rate time.Duration specifies
+			//blocking) the process for as long as the rate time.Duration specifies
 			<-throttle
 		}
 
 		res, err := api.NewRequest("POST", endpoint, data).WithAuth(keys).Do(c)
 		bar.Increment()
 
+		//if there is no error, response status is 200 OK, and "error_code" = 0, we have a success
 		if err == nil && res.Status == 200 && res.Data.Get("error_code").MustInt() == 0 {
-			success++
-		} else {
+			success++ //so then increment the numer of success
+		} else { //else, log the error and break the loop to prevent further errors
 			errData, err := res.Data.Encode()
 			utils.LogErr(c, err)
 			finishMsg = fmt.Sprintf("Error adding %s %d: %s\n", endpoint, i, string(errData[:])) + finishMsg
