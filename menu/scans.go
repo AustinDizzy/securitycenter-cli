@@ -252,12 +252,13 @@ func importScans(c *cli.Context) error {
 		bar.Increment()
 
 		utils.LogErr(c, err, res.Data.Interface())
+		var errData []byte
 
 		//if there is no error, response status is 200 OK, and "error_code" = 0, we have a success
 		if err == nil && res.Status == 200 && res.Data.Get("error_code").MustInt() == 0 {
 			success++ //so then increment the numer of success
 		} else { //else, log the error and break the loop to prevent further errors
-			errData, err := res.Data.Encode()
+			errData, err = res.Data.Encode()
 			utils.LogErr(c, err)
 			finishMsg = fmt.Sprintf("Error adding scan %d: %s\n", i, string(errData[:])) + finishMsg
 			break

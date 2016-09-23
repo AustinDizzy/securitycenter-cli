@@ -62,8 +62,9 @@ func main() {
 		return err
 	}
 
-	app.Action = func(c *cli.Context) {
+	app.Action = func(c *cli.Context) error {
 		cli.ShowAppHelp(c)
+		return nil
 	}
 
 	app.After = func(c *cli.Context) error {

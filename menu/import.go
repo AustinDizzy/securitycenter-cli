@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -113,6 +114,8 @@ func do(c *cli.Context, typeSwitch int, r *csv.Reader) {
 	switch typeSwitch {
 	case importAssets:
 		endpoint = "asset"
+		loadedGroups, err = api.NewRequest("GET", "group").WithAuth(keys).Do(c)
+		utils.LogErr(c, err)
 	case importUsers:
 		endpoint = "user"
 		loadedRoles, err = api.NewRequest("GET", "role", map[string]interface{}{
@@ -136,9 +139,12 @@ func do(c *cli.Context, typeSwitch int, r *csv.Reader) {
 
 	bar.Start() //start the progress bar
 
-	var ( //instantiate variables required for rate limiting / throttling
+	var (
+		//instantiate variables required for rate limiting / throttling
 		rate     time.Duration
 		throttle <-chan time.Time
+		//instantiate maps for Name<->ID operations
+		groupIDMap = loadIDNameMap(loadedGroups.Data.Get("response").MustArray())
 	)
 
 	if c.GlobalInt("throttle") > 0 {
@@ -152,6 +158,10 @@ func do(c *cli.Context, typeSwitch int, r *csv.Reader) {
 			// data is the key-value object which will be converted to a
 			// JSON object to be posted to its respective endpoint
 			data = make(map[string]interface{})
+			// method is the HTTP method the request will use to process the data
+			// by default, it adds the data with a POST request. If the data contains
+			// an ID, it will switch to PATCH and edit the existing data.
+			method = "POST"
 		)
 		for pos, value := range row {
 			data[headers[pos]] = value
@@ -163,6 +173,7 @@ func do(c *cli.Context, typeSwitch int, r *csv.Reader) {
 			delete(data, "owner")
 			delete(data, "ownerGroup")
 			if data["type"] == "dynamic" {
+				// dynamic assets have no defined IPs
 				delete(data, "definedIPs")
 				if rules, ok := data["rules"]; ok {
 					rulesJSON, err := simplejson.NewJson([]byte(fmt.Sprint(rules)))
@@ -174,6 +185,24 @@ func do(c *cli.Context, typeSwitch int, r *csv.Reader) {
 				}
 			} else {
 				delete(data, "rules")
+			}
+			// if the row contains an ID, switch the request to a PATCH request, which
+			// modifies the existing asset located at the provided ID
+			if id, ok := data["id"]; ok {
+				endpoint += ("/" + fmt.Sprint(id))
+				method = "PATCH"
+			}
+			if grpsVal, ok := data["groups"]; ok {
+				var (
+					groups   = strings.Split(fmt.Sprint(grpsVal), "|")
+					groupIDs []map[string]interface{}
+				)
+				for _, group := range groups {
+					groupIDs = append(groupIDs, map[string]interface{}{
+						"id": groupIDMap[group],
+					})
+				}
+				data["groups"] = groupIDs
 			}
 		case importUsers:
 			//default user preferences
@@ -289,7 +318,7 @@ func do(c *cli.Context, typeSwitch int, r *csv.Reader) {
 			<-throttle
 		}
 
-		res, err := api.NewRequest("POST", endpoint, data).WithAuth(keys).Do(c)
+		res, err := api.NewRequest(method, endpoint, data).WithAuth(keys).Do(c)
 		bar.Increment()
 
 		//if there is no error, response status is 200 OK, and "error_code" = 0, we have a success
@@ -303,4 +332,16 @@ func do(c *cli.Context, typeSwitch int, r *csv.Reader) {
 		}
 	}
 	bar.FinishPrint(fmt.Sprintf(finishMsg, success, len(records[1:]), endpoint, time.Since(t)))
+}
+
+func loadIDNameMap(data []interface{}) map[string]int {
+	var resultMap = make(map[string]int)
+	for _, r := range data {
+		switch r.(type) {
+		case map[string]interface{}:
+			row := r.(map[string]interface{})
+			resultMap[fmt.Sprint(row["name"])], _ = strconv.Atoi(fmt.Sprint(row["id"]))
+		}
+	}
+	return resultMap
 }
