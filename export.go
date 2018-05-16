@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 
 	"github.com/austindizzy/securitycenter-cli/api"
@@ -73,10 +74,21 @@ func export(c *cli.Context) error {
 				for _, v := range strings.Split(c.String("fields"), ",") {
 					if strings.Contains(v, ".") {
 						var (
-							tmp = strings.Split(v, ".")
-							obj = data[tmp[0]].(map[string]interface{})
+							tmp  = strings.Split(v, ".")
+							obj  = data[tmp[0]]
+							c    []string
+							cell string
 						)
-						row = append(row, fmt.Sprint(obj[tmp[1]]))
+						switch reflect.TypeOf(data[tmp[0]]).Kind() {
+						case reflect.Slice:
+							for _, r := range obj.([]interface{}) {
+								c = append(c, fmt.Sprint(r.(map[string]interface{})[tmp[1]]))
+							}
+							cell = strings.Join(c, "|")
+						case reflect.Map:
+							cell = fmt.Sprint(obj.(map[string]interface{})[tmp[1]])
+						}
+						row = append(row, cell)
 					} else {
 						row = append(row, fmt.Sprint(data[v]))
 					}
