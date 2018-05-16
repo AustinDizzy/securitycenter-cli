@@ -101,7 +101,7 @@ func main() {
 		},
 		{
 			Name:    "test",
-			Aliases: []string{"c"},
+			Aliases: []string{"t"},
 			Usage:   "test auth token for validity",
 			Action: func(c *cli.Context) error {
 				auth.Test(c)
