@@ -326,9 +326,13 @@ func do(c *cli.Context, typeSwitch int, r *csv.Reader) {
 			success++ //so then increment the numer of success
 		} else { //else, log the error and break the loop to prevent further errors
 			errData, err := res.Data.Encode()
+			var msg = fmt.Sprintf("Error adding %s %d: %s\n", endpoint, i, string(errData[:]))
+			fmt.Println(msg)
 			utils.LogErr(c, err)
-			finishMsg = fmt.Sprintf("Error adding %s %d: %s\n", endpoint, i, string(errData[:])) + finishMsg
-			break
+			finishMsg = msg + finishMsg
+			if strings.IndexRune(strings.ToLower(GetInput("Continue?")), 'n') == 0 {
+				break
+			}
 		}
 	}
 	bar.FinishPrint(fmt.Sprintf(finishMsg, success, len(records[1:]), endpoint, time.Since(t)))
