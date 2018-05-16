@@ -141,6 +141,10 @@ func Do(c *cli.Context) {
 		"username": username,
 	}).WithAuth(data).Do(c)
 
+	if mtch := sessionRgx.FindStringSubmatch(res.HTTPRes.Header.Get("Set-Cookie")); len(mtch) > 1 {
+		data["session"] = mtch[1]
+	}
+
 	jsonStr, err = res.Data.MarshalJSON()
 	utils.LogErr(c, err, string(jsonStr[:]))
 

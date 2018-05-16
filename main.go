@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
-	"time"
 
 	"github.com/austindizzy/securitycenter-cli/auth"
 	"github.com/austindizzy/securitycenter-cli/menu"
@@ -132,9 +130,9 @@ func main() {
 				}
 				utils.LogErr(c, err, keys)
 
-				i, err := strconv.ParseInt(keys["__timestamp"], 10, 64)
-				utils.LogErr(c, err)
-				fmt.Printf("%s Keys:\ntoken: %s\tsession: %s\n", time.Unix(i, 0), keys["token"], keys["session"])
+				// i, err := strconv.ParseInt(keys["__timestamp"], 10, 64)
+				// utils.LogErr(c, err)
+				// fmt.Printf("%s Keys:\ntoken: %s\tsession: %s\n", time.Unix(i, 0), keys["token"], keys["session"])
 				return err
 			},
 			Subcommands: []cli.Command{{
