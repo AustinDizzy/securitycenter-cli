@@ -124,11 +124,9 @@ func main() {
 			Aliases: []string{"c"},
 			Usage:   "get/set auth tokens",
 			Action: func(c *cli.Context) error {
-				var (
-					keys map[string]string
-					err  error
-				)
-				if keys, err = auth.Get(c); len(keys) == 0 {
+				keys, err := auth.Get(c)
+				utils.LogErr(c, err)
+				if len(keys) == 0 {
 					auth.Do(c)
 					keys, err = auth.Get(c)
 				}

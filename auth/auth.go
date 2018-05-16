@@ -2,6 +2,8 @@ package auth
 
 import (
 	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -39,11 +41,10 @@ func Get(c *cli.Context) (map[string]string, error) {
 		db     *bolt.DB
 		err    error
 		data   = map[string]string{}
-		bucket = fmt.Sprintf("%s|%s", BucketName, c.GlobalString("host"))
-		b      *bolt.Bucket
+		bucket = []byte(fmt.Sprintf("%s|%s", BucketName, c.GlobalString("host")))
 	)
 
-	if len(c.GlobalString("token")) > 0 && len(c.GlobalString("session")) > 0 {
+	if c.GlobalIsSet("token") && c.GlobalIsSet("session") {
 		data["token"] = c.GlobalString("token")
 		data["session"] = c.GlobalString("session")
 		return data, nil
@@ -51,26 +52,22 @@ func Get(c *cli.Context) (map[string]string, error) {
 
 	db, err = bolt.Open(DB, 0600, nil)
 
-	if err != nil && err.Error() != "" {
+	if err != nil {
 		return data, err
 	}
 	defer db.Close()
 
-	db.Update(func(tx *bolt.Tx) error {
-		b, err = tx.CreateBucketIfNotExists([]byte(bucket))
-		return err
-	})
-
-	db.View(func(tx *bolt.Tx) error {
-		b.ForEach(func(k, v []byte) error {
-			data[string(k[:])] = string(v[:])
+	err = db.View(func(tx *bolt.Tx) error {
+		return tx.Bucket(bucket).ForEach(func(k, v []byte) error {
+			key, val := bytes.NewBuffer(k).String(), bytes.NewBuffer(v).String()
+			data[key] = val
 			return nil
 		})
-		return nil
 	})
+	utils.LogErr(c, err, data)
 
-	if _, ok := data["__timestamp"]; ok {
-		i, err = strconv.ParseInt(data["__timestamp"], 10, 64)
+	if t, ok := data["__timestamp"]; ok {
+		i, err = strconv.ParseInt(t, 10, 64)
 		if time.Since(time.Unix(i, 0)) > ETC {
 			err = Delete(c)
 			println("Your session has expired.")
@@ -97,10 +94,11 @@ func Set(c *cli.Context, keys map[string]string) {
 	keys["__timestamp"] = fmt.Sprint(time.Now().Unix())
 
 	for k, v = range keys {
-		db.Update(func(tx *bolt.Tx) error {
+		err = db.Update(func(tx *bolt.Tx) error {
 			b, _ := tx.CreateBucketIfNotExists([]byte(bucket))
 			return b.Put([]byte(k), []byte(v))
 		})
+		utils.LogErr(c, err, k, v)
 	}
 }
 
@@ -124,10 +122,11 @@ func Do(c *cli.Context) {
 
 	fmt.Printf("Password: ")
 	if c.GlobalBool("debug") {
-		password = gopass.GetPasswdMasked()
+		password, err = gopass.GetPasswdMasked()
 	} else {
-		password = gopass.GetPasswd()
+		password, err = gopass.GetPasswd()
 	}
+	utils.LogErr(c, err)
 
 	res, err := api.NewRequest("GET", "system").Do(c)
 	utils.LogErr(c, err)
@@ -189,6 +188,8 @@ func Test(c *cli.Context) (ok bool) {
 		keys, err = Get(c)
 		res       *api.Result
 	)
+
+	utils.LogErr(c, err)
 
 	if err != nil {
 		utils.LogErr(c, err, res)
