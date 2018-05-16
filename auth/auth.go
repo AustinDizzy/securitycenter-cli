@@ -50,7 +50,8 @@ func Get(c *cli.Context) (map[string]string, error) {
 		return data, nil
 	}
 
-	db, err = bolt.Open(DB, 0600, nil)
+	db, err = initDB(c)
+	utils.LogErr(c, err)
 
 	if err != nil {
 		return data, err
@@ -208,4 +209,39 @@ func Test(c *cli.Context) (ok bool) {
 	}
 
 	return ok
+}
+
+func initDB(c *cli.Context) (*bolt.DB, error) {
+	var (
+		db     *bolt.DB
+		err    error
+		bucket = []byte(fmt.Sprint(BucketName, "|", c.GlobalString("host")))
+	)
+
+	db, err = bolt.Open(DB, 0666, nil)
+
+	if err != nil {
+		return db, err
+	}
+
+	err = db.Update(func(tx *bolt.Tx) error {
+		var (
+			b         *bolt.Bucket
+			bucketErr = errors.New("Error creating bucket.")
+		)
+		if tx.Writable() {
+			b, _ = tx.CreateBucketIfNotExists(bucket)
+			if b == nil {
+				return bucketErr
+			}
+		} else {
+			return bolt.ErrTxNotWritable
+		}
+		if b != nil {
+			return nil
+		}
+		return bucketErr
+	})
+
+	return db, err
 }
