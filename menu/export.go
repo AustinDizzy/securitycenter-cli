@@ -99,6 +99,7 @@ func exportScans(c *cli.Context, w *csv.Writer) {
 		scans = res.Data.GetPath("response", "manageable").MustArray()
 		bar   = pb.New(len(scans))
 	)
+
 	utils.LogErr(c, err)
 	s.Stop()
 	bar.Start()
@@ -191,7 +192,7 @@ func exportAssets(c *cli.Context, w *csv.Writer) {
 		records [][]string
 		s       = spinner.New(spinner.CharSets[9], 100*time.Millisecond)
 		query   = map[string]interface{}{
-			"filter": "manageable",
+			"filter": "manageable,usable",
 			"fields": "id,type,name,description,typeFields,groups,owner,ownerGroup",
 		}
 		keys, err = auth.Get(c)
@@ -210,8 +211,14 @@ func exportAssets(c *cli.Context, w *csv.Writer) {
 
 	var (
 		assets = res.Data.GetPath("response", "manageable").MustArray()
-		bar    = pb.New(len(assets))
+		bar    *pb.ProgressBar
 	)
+
+	if len(assets) == 0 {
+		assets = res.Data.GetPath("response", "usable").MustArray()
+	}
+
+	bar = pb.New(len(assets))
 
 	utils.LogErr(c, err)
 	s.Stop()

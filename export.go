@@ -16,9 +16,11 @@ import (
 func export(c *cli.Context) error {
 	fmt.Println("exporting", c.Args().First())
 	var (
-		w         *csv.Writer
-		headers   []string
-		query     = map[string]interface{}{}
+		w       *csv.Writer
+		headers []string
+		query   = map[string]interface{}{
+			"filter": "manageable",
+		}
 		keys, err = auth.Get(c)
 		file      *os.File
 		res       *api.Result
